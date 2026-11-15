@@ -31,8 +31,6 @@
 			{
 				"name": "biling",
 				"type": "ExecuteDataFlow",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "diagnoses",
@@ -64,8 +62,6 @@
 			{
 				"name": "diagnoses",
 				"type": "ExecuteDataFlow",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "admissions",
@@ -97,6 +93,8 @@
 			{
 				"name": "admissions",
 				"type": "ExecuteDataFlow",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "patients",

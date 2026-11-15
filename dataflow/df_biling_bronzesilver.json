@@ -78,7 +78,7 @@
 				"          charge_type = iif(isNull(charge_type),'Unknown',charge_type),",
 				"          payment_status = initCap(lower(payment_status)),",
 				"          amount = replace(replace(replace(replace(amount,'USD',''),'$',''),',',''),' ',''),",
-				"          columna1 = case(   isNull(payment_date), toDate(null()),   instr(payment_date,',')>0, toDate(payment_date,'MMMM dd, yyyy'),   instr(payment_date,'/')>0, toDate(payment_date,'MM/dd/yyyy'),   substring(payment_date,5,1)=='-', toDate(payment_date,'yyyy-MM-dd'),   length(payment_date)==8, toDate(concat(left(payment_date,6), iif(toInteger(right(payment_date,2))<=26,'20','19'), right(payment_date,2)), 'MM-dd-yyyy'),   length(payment_date)==11, toDate(payment_date,'dd-MMM-yyyy'),   toDate(null()))) ~> normalizar",
+				"          payment_date = case(   isNull(payment_date), toDate(null()),   instr(payment_date,',')>0, toDate(payment_date,'MMMM dd, yyyy'),   instr(payment_date,'/')>0, toDate(payment_date,'MM/dd/yyyy'),   substring(payment_date,5,1)=='-', toDate(payment_date,'yyyy-MM-dd'),   length(payment_date)==8, toDate(concat(left(payment_date,6), iif(toInteger(right(payment_date,2))<=26,'20','19'), right(payment_date,2)), 'MM-dd-yyyy'),   length(payment_date)==11, toDate(payment_date,'dd-MMM-yyyy'),   toDate(null()))) ~> normalizar",
 				"normalizar derive(amount = toDecimal(round(toDouble(amount),2), 12, 2)) ~> reglas",
 				"reglas split(!isNull(billing_id) && !isNull(admission_id) && !isNull(amount) && amount>0,",
 				"     disjoint: false) ~> split1@(valido, novalido)",
