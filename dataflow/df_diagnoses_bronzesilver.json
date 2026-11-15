@@ -1,0 +1,105 @@
+{
+	"name": "df_diagnoses_bronzesilver",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "bronze_sql_diagnoses",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "silver_sql_diagnoses",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "flatten1"
+				},
+				{
+					"name": "reglas"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          diagnosis_id as string,",
+				"          admission_id as string,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(diagnosis_id = toInteger(diagnosis_id),",
+				"          admission_id = toInteger(admission_id),",
+				"          severity = iif(isNull(severity),'Unknown',initCap(lower(severity))),",
+				"          icd_code = map(split(icd_code,','), upper(replace(replace(replace(trim(#item),'-',''),'.',''),' ','')))) ~> normalizar",
+				"normalizar foldDown(unroll(icd_code, icd_code),",
+				"     mapColumn(",
+				"          diagnosis_id,",
+				"          admission_id,",
+				"          icd_code,",
+				"          diagnosis_description,",
+				"          severity",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flatten1",
+				"flatten1 derive(icd_code = iif(length(icd_code)>3, concat(substring(icd_code,1,3),'.',substring(icd_code,4,length(icd_code)-3)), icd_code)) ~> reglas",
+				"reglas split(!isNull(diagnosis_id) && !isNull(admission_id) && !isNull(icd_code),",
+				"     disjoint: false) ~> split1@(valido, novalido)",
+				"split1@valido aggregate(groupBy(diagnosis_id,",
+				"          icd_code),",
+				"     diagnosis_description = first(diagnosis_description),",
+				"          admission_id = first(admission_id),",
+				"          severity = first(severity)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          diagnosis_id as integer,",
+				"          admission_id as integer,",
+				"          icd_code as string,",
+				"          diagnosis_description as string,",
+				"          severity as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          diagnosis_id,",
+				"          admission_id,",
+				"          icd_code,",
+				"          diagnosis_description,",
+				"          severity",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}
