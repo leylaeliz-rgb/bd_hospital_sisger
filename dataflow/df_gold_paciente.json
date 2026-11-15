@@ -1,0 +1,68 @@
+{
+	"name": "df_gold_paciente",
+	"properties": {
+		"folder": {
+			"name": "gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "silver_sql_patients",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "gold_dim_paciente",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          patient_id as integer,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as date,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT\\n    t.patient_id AS patient_id_bk,\\n    t.full_name AS nombre_completo,\\n    CASE t.gender WHEN \\'Male\\' THEN \\'Masculino\\'\\n                  WHEN \\'Female\\' THEN \\'Femenino\\'\\n                  ELSE \\'Otro\\' END AS genero,\\n    t.date_of_birth AS fecha_nacimiento,\\n    CASE WHEN t.edad IS NULL THEN NULL\\n         WHEN t.edad <= 18 THEN \\'0-18\\'\\n         WHEN t.edad <= 35 THEN \\'19-35\\'\\n         WHEN t.edad <= 60 THEN \\'36-60\\'\\n         ELSE \\'60+\\' END AS rango_etario,\\n    t.email AS correo_electronico,\\n    t.address AS direccion,\\n    COALESCE(t.insurance_provider, \\'Unknown\\') AS proveedor_seguro\\nFROM (\\n    SELECT p.*,\\n           CASE WHEN p.date_of_birth IS NULL THEN NULL\\n                ELSE DATEDIFF(YEAR, p.date_of_birth, GETDATE())\\n                     - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.date_of_birth, GETDATE()), p.date_of_birth) > CAST(GETDATE() AS DATE)\\n                            THEN 1 ELSE 0 END\\n           END AS edad\\n    FROM silver.patients p\\n) t',",
+				"     format: 'query') ~> source1",
+				"source1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          paciente_key as integer,",
+				"          patient_id_bk as integer,",
+				"          nombre_completo as string,",
+				"          genero as string,",
+				"          fecha_nacimiento as date,",
+				"          rango_etario as string,",
+				"          correo_electronico as string,",
+				"          direccion as string,",
+				"          proveedor_seguro as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> sink1"
+			]
+		}
+	}
+}

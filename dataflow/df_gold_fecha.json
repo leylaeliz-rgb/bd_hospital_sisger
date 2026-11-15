@@ -1,0 +1,70 @@
+{
+	"name": "df_gold_fecha",
+	"properties": {
+		"folder": {
+			"name": "gold"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "silver_sql_admissions",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "gold_dim_fecha",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT\\n    CONVERT(INT, CONVERT(CHAR(8), f.fecha, 112)) AS fecha_key,\\n    f.fecha AS fecha_completa,\\n    YEAR(f.fecha) AS anio,\\n    DATEPART(QUARTER, f.fecha) AS trimestre,\\n    \\'T\\' + CAST(DATEPART(QUARTER, f.fecha) AS VARCHAR(1)) AS trimestre_nombre,\\n    MONTH(f.fecha) AS mes,\\n    CHOOSE(MONTH(f.fecha), \\'Enero\\',\\'Febrero\\',\\'Marzo\\',\\'Abril\\',\\'Mayo\\',\\'Junio\\',\\'Julio\\',\\'Agosto\\',\\'Septiembre\\',\\'Octubre\\',\\'Noviembre\\',\\'Diciembre\\') AS mes_nombre,\\n    CHOOSE(MONTH(f.fecha), \\'Ene\\',\\'Feb\\',\\'Mar\\',\\'Abr\\',\\'May\\',\\'Jun\\',\\'Jul\\',\\'Ago\\',\\'Sep\\',\\'Oct\\',\\'Nov\\',\\'Dic\\') AS mes_corto,\\n    DATEPART(ISO_WEEK, f.fecha) AS semana_anio,\\n    DAY(f.fecha) AS dia_mes,\\n    ds.dia_semana AS dia_semana,\\n    CHOOSE(ds.dia_semana, \\'Lunes\\',\\'Martes\\',\\'Miércoles\\',\\'Jueves\\',\\'Viernes\\',\\'Sábado\\',\\'Domingo\\') AS dia_nombre,\\n    CAST(CASE WHEN ds.dia_semana IN (6,7) THEN 1 ELSE 0 END AS BIT) AS es_fin_de_semana\\nFROM (\\n    SELECT admission_date AS fecha FROM silver.admissions\\n    UNION\\n    SELECT discharge_date FROM silver.admissions\\n    UNION\\n    SELECT payment_date FROM silver.billing\\n) f\\nCROSS APPLY (SELECT (DATEDIFF(DAY, \\'19000101\\', f.fecha) % 7) + 1 AS dia_semana) ds\\nWHERE f.fecha IS NOT NULL',",
+				"     format: 'query') ~> source1",
+				"source1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          fecha_key as integer,",
+				"          fecha_completa as date,",
+				"          anio as integer,",
+				"          trimestre as integer,",
+				"          trimestre_nombre as string,",
+				"          mes as integer,",
+				"          mes_nombre as string,",
+				"          mes_corto as string,",
+				"          semana_anio as integer,",
+				"          dia_mes as integer,",
+				"          dia_semana as integer,",
+				"          dia_nombre as string,",
+				"          es_fin_de_semana as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> sink1"
+			]
+		}
+	}
+}
