@@ -1,0 +1,21 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-ucb-transporte-us-75993090"
+		},
+		"dw_hospital_password": {
+			"value": ""
+		},
+		"dw_hospital_properties_typeProperties_server": {
+			"value": "sql-ucb-server-hospital-75993090.database.windows.net"
+		},
+		"dw_hospital_properties_typeProperties_database": {
+			"value": "dw_hospital"
+		},
+		"dw_hospital_properties_typeProperties_userName": {
+			"value": "leyla"
+		}
+	}
+}
