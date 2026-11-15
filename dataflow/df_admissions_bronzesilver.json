@@ -12,8 +12,29 @@
 					"name": "bronze"
 				}
 			],
-			"sinks": [],
-			"transformations": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "silver_sql_admissions",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "reglas"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
 			"scriptLines": [
 				"source(output(",
 				"          admission_id as string,",
@@ -26,7 +47,48 @@
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     format: 'table') ~> bronze"
+				"     format: 'table') ~> bronze",
+				"bronze derive(patient_id = toInteger(patient_id),",
+				"          admission_id = toInteger(admission_id),",
+				"          attending_doctor_id = toInteger(attending_doctor_id),",
+				"          department = lower(replace(department,' ','')),",
+				"          admission_date = case(   isNull(admission_date), toDate(null()),   instr(admission_date,',')>0, toDate(admission_date,'MMMM dd, yyyy'),   instr(admission_date,'/')>0, toDate(admission_date,'MM/dd/yyyy'),   substring(admission_date,5,1)=='-', toDate(admission_date,'yyyy-MM-dd'),   length(admission_date)==8, toDate(concat(left(admission_date,6), iif(toInteger(right(admission_date,2))<=26,'20','19'), right(admission_date,2)), 'MM-dd-yyyy'),   length(admission_date)==11, toDate(admission_date,'dd-MMM-yyyy'),   toDate(null())),",
+				"          discharge_date = case(   isNull(discharge_date), toDate(null()),   instr(discharge_date,',')>0, toDate(discharge_date,'MMMM dd, yyyy'),   instr(discharge_date,'/')>0, toDate(discharge_date,'MM/dd/yyyy'),   substring(discharge_date,5,1)=='-', toDate(discharge_date,'yyyy-MM-dd'),   length(discharge_date)==8, toDate(concat(left(discharge_date,6), iif(toInteger(right(discharge_date,2))<=26,'20','19'), right(discharge_date,2)), 'MM-dd-yyyy'),   length(discharge_date)==11, toDate(discharge_date,'dd-MMM-yyyy'),   toDate(null()))) ~> normalizar",
+				"normalizar derive(department = case(   in(['cardiolgy','cardiology','cardio'],department),'Cardiology',   in(['oncology','oncologyy','onco'],department),'Oncology',   in(['emergency','emergancy','er'],department),'Emergency',   in(['pediatrics','paediatrics','peds'],department),'Pediatrics',   in(['neurology','nuerology','neuro'],department),'Neurology',   in(['orthopedics','orthopaedics','ortho'],department),'Orthopedics',   in(['generalsurgery','gensurg'],department),'General Surgery',   'Unknown'),",
+				"          discharge_date = iif(!isNull(discharge_date) && !isNull(admission_date) \r",
+				"&& discharge_date<admission_date, toDate(null()), discharge_date)) ~> reglas",
+				"reglas split(!isNull(admission_id) && !isNull(patient_id) && !isNull(admission_date),",
+				"     disjoint: false) ~> split1@(valido, novalido)",
+				"split1@valido aggregate(groupBy(admission_id),",
+				"     patient_id = first(patient_id),",
+				"          admission_date = first(admission_date),",
+				"          department = first(department),",
+				"          attending_doctor_id = first(attending_doctor_id)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          admission_id,",
+				"          patient_id,",
+				"          admission_date,",
+				"          department,",
+				"          attending_doctor_id",
+				"     )) ~> sink1"
 			]
 		}
 	}
