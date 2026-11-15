@@ -1,6 +1,9 @@
 {
 	"name": "df_admissions_bronzesilver",
 	"properties": {
+		"folder": {
+			"name": "silver"
+		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
 			"sources": [

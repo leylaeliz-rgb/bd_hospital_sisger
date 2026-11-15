@@ -1,0 +1,97 @@
+{
+	"name": "df_biling_bronzesilver",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "bronze_sql_biling",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "silver_sql_biling",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizar"
+				},
+				{
+					"name": "reglas"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "aggregate1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          billing_id as string,",
+				"          admission_id as string,",
+				"          charge_type as string,",
+				"          amount as string,",
+				"          payment_status as string,",
+				"          payment_date as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(billing_id = toInteger(billing_id),",
+				"          admission_id = toInteger(admission_id),",
+				"          charge_type = iif(isNull(charge_type),'Unknown',charge_type),",
+				"          payment_status = initCap(lower(payment_status)),",
+				"          amount = replace(replace(replace(replace(amount,'USD',''),'$',''),',',''),' ',''),",
+				"          columna1 = case(   isNull(payment_date), toDate(null()),   instr(payment_date,',')>0, toDate(payment_date,'MMMM dd, yyyy'),   instr(payment_date,'/')>0, toDate(payment_date,'MM/dd/yyyy'),   substring(payment_date,5,1)=='-', toDate(payment_date,'yyyy-MM-dd'),   length(payment_date)==8, toDate(concat(left(payment_date,6), iif(toInteger(right(payment_date,2))<=26,'20','19'), right(payment_date,2)), 'MM-dd-yyyy'),   length(payment_date)==11, toDate(payment_date,'dd-MMM-yyyy'),   toDate(null()))) ~> normalizar",
+				"normalizar derive(amount = toDecimal(round(toDouble(amount),2), 12, 2)) ~> reglas",
+				"reglas split(!isNull(billing_id) && !isNull(admission_id) && !isNull(amount) && amount>0,",
+				"     disjoint: false) ~> split1@(valido, novalido)",
+				"split1@valido aggregate(groupBy(billing_id),",
+				"     admission_id = first(admission_id),",
+				"          charge_type = first(charge_type),",
+				"          amount = first(amount),",
+				"          payment_status = first(payment_status),",
+				"          payment_date = first(payment_date)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          billing_id as integer,",
+				"          admission_id as integer,",
+				"          charge_type as string,",
+				"          amount as decimal(12,2),",
+				"          payment_status as string,",
+				"          payment_date as date",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          billing_id,",
+				"          admission_id,",
+				"          charge_type,",
+				"          amount,",
+				"          payment_status",
+				"     )) ~> sink1"
+			]
+		}
+	}
+}
