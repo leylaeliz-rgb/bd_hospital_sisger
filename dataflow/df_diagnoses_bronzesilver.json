@@ -13,6 +13,13 @@
 						"type": "DatasetReference"
 					},
 					"name": "source1"
+				},
+				{
+					"dataset": {
+						"referenceName": "silver_sql_admissions",
+						"type": "DatasetReference"
+					},
+					"name": "admisionsilver"
 				}
 			],
 			"sinks": [
@@ -39,6 +46,9 @@
 				},
 				{
 					"name": "aggregate1"
+				},
+				{
+					"name": "exists1"
 				}
 			],
 			"scriptLines": [
@@ -53,6 +63,18 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> source1",
+				"source(output(",
+				"          admission_id as integer,",
+				"          patient_id as integer,",
+				"          admission_date as date,",
+				"          discharge_date as date,",
+				"          department as string,",
+				"          attending_doctor_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> admisionsilver",
 				"source1 derive(diagnosis_id = toInteger(diagnosis_id),",
 				"          admission_id = toInteger(admission_id),",
 				"          severity = iif(isNull(severity),'Unknown',initCap(lower(severity))),",
@@ -70,11 +92,14 @@
 				"flatten1 derive(icd_code = iif(length(icd_code)>3, concat(substring(icd_code,1,3),'.',substring(icd_code,4,length(icd_code)-3)), icd_code)) ~> reglas",
 				"reglas split(!isNull(diagnosis_id) && !isNull(admission_id) && !isNull(icd_code),",
 				"     disjoint: false) ~> split1@(valido, novalido)",
-				"split1@valido aggregate(groupBy(diagnosis_id,",
+				"exists1 aggregate(groupBy(diagnosis_id,",
 				"          icd_code),",
 				"     diagnosis_description = first(diagnosis_description),",
 				"          admission_id = first(admission_id),",
 				"          severity = first(severity)) ~> aggregate1",
+				"split1@valido, admisionsilver exists(split1@valido@admission_id == admisionsilver@admission_id,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> exists1",
 				"aggregate1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",

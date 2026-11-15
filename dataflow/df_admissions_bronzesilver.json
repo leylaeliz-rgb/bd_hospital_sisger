@@ -13,6 +13,13 @@
 						"type": "DatasetReference"
 					},
 					"name": "bronze"
+				},
+				{
+					"dataset": {
+						"referenceName": "silver_sql_patients",
+						"type": "DatasetReference"
+					},
+					"name": "srcpacientesliver"
 				}
 			],
 			"sinks": [
@@ -36,6 +43,9 @@
 				},
 				{
 					"name": "aggregate1"
+				},
+				{
+					"name": "exists1"
 				}
 			],
 			"scriptLines": [
@@ -51,6 +61,20 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> bronze",
+				"source(output(",
+				"          patient_id as integer,",
+				"          full_name as string,",
+				"          gender as string,",
+				"          date_of_birth as date,",
+				"          phone as string,",
+				"          email as string,",
+				"          address as string,",
+				"          insurance_provider as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> srcpacientesliver",
 				"bronze derive(patient_id = toInteger(patient_id),",
 				"          admission_id = toInteger(admission_id),",
 				"          attending_doctor_id = toInteger(attending_doctor_id),",
@@ -62,11 +86,14 @@
 				"&& discharge_date<admission_date, toDate(null()), discharge_date)) ~> reglas",
 				"reglas split(!isNull(admission_id) && !isNull(patient_id) && !isNull(admission_date),",
 				"     disjoint: false) ~> split1@(valido, novalido)",
-				"split1@valido aggregate(groupBy(admission_id),",
+				"exists1 aggregate(groupBy(admission_id),",
 				"     patient_id = first(patient_id),",
 				"          admission_date = first(admission_date),",
 				"          department = first(department),",
 				"          attending_doctor_id = first(attending_doctor_id)) ~> aggregate1",
+				"split1@valido, srcpacientesliver exists(split1@valido@patient_id == srcpacientesliver@patient_id,",
+				"     negate:false,",
+				"     broadcast: 'auto')~> exists1",
 				"aggregate1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
